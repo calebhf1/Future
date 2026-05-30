@@ -25,7 +25,7 @@ export default function Layout() {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="px-6 py-7 border-b" style={{ borderColor: 'var(--stone-200)' }}>
-        <div className="font-display text-2xl" style={{ color: 'var(--stone-800)' }}>Hearth</div>
+        <div className="font-display text-2xl" style={{ color: 'var(--stone-800)' }}>Future</div>
         <div className="text-xs mt-0.5" style={{ color: 'var(--stone-400)' }}>Family Budget</div>
       </div>
 
@@ -82,7 +82,7 @@ export default function Layout() {
 
       {/* Mobile header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-4 border-b" style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
-        <div className="font-display text-xl" style={{ color: 'var(--stone-800)' }}>Hearth</div>
+        <div className="font-display text-xl" style={{ color: 'var(--stone-800)' }}>Future</div>
         <button onClick={() => setMobileOpen(!mobileOpen)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stone-600)' }}>
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
