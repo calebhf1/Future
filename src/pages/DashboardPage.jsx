@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { format, startOfMonth, endOfMonth } from 'date-fns'
-import { TrendingUp, TrendingDown, DollarSign, Target, ChevronLeft, ChevronRight } from 'lucide-react'
+import { format } from 'date-fns'
+import { TrendingUp, TrendingDown, DollarSign, Target, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { getTransactions, getIncome, getSavingsGoals, getCategories } from '../lib/supabase'
+import { getTransactions, getIncome, getSavingsGoals, getCategories, addTransaction } from '../lib/supabase'
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 
@@ -17,6 +17,9 @@ export default function DashboardPage() {
   const [goals, setGoals] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [quickForm, setQuickForm] = useState({ description: '', amount: '', category_id: '', date: format(new Date(), 'yyyy-MM-dd'), type: 'expense' })
+  const [quickSaving, setQuickSaving] = useState(false)
 
   const load = useCallback(async () => {
     if (!user) return
@@ -36,6 +39,21 @@ export default function DashboardPage() {
 
   useEffect(() => { load() }, [load])
 
+  const handleQuickAdd = async (e) => {
+    e.preventDefault()
+    setQuickSaving(true)
+    await addTransaction({
+      ...quickForm,
+      amount: parseFloat(quickForm.amount),
+      user_id: user.id,
+      category_id: quickForm.category_id || null,
+    })
+    setShowQuickAdd(false)
+    setQuickForm({ description: '', amount: '', category_id: '', date: format(new Date(), 'yyyy-MM-dd'), type: 'expense' })
+    await load()
+    setQuickSaving(false)
+  }
+
   const totalIncome = income.reduce((s, i) => s + Number(i.amount), 0)
   const totalSpent = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
   const totalSaved = transactions.filter(t => t.type === 'savings').reduce((s, t) => s + Number(t.amount), 0)
@@ -43,7 +61,6 @@ export default function DashboardPage() {
   const totalGoalTarget = goals.reduce((s, g) => s + Number(g.target_amount), 0)
   const totalGoalSaved = goals.reduce((s, g) => s + Number(g.current_amount), 0)
 
-  // Spending by category for pie chart
   const spendingByCategory = categories.map(cat => {
     const spent = transactions
       .filter(t => t.category_id === cat.id && t.type === 'expense')
@@ -51,7 +68,6 @@ export default function DashboardPage() {
     return { name: cat.name, value: spent, color: cat.color || '#6B5B4E', budget: Number(cat.budget_amount || 0) }
   }).filter(c => c.value > 0)
 
-  // Budget vs actual bar chart
   const budgetData = categories
     .filter(c => Number(c.budget_amount) > 0)
     .map(cat => ({
@@ -70,6 +86,9 @@ export default function DashboardPage() {
   }
 
   const monthLabel = format(new Date(year, month - 1, 1), 'MMMM yyyy')
+
+  const inputStyle = { background: 'var(--cream)', border: '1.5px solid var(--stone-200)', color: 'var(--stone-800)', fontFamily: 'inherit' }
+  const inputClass = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
 
   const StatCard = ({ icon: Icon, label, value, sub, color, delay }) => (
     <div className={`p-6 rounded-2xl border fade-up-${delay}`} style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
@@ -93,7 +112,7 @@ export default function DashboardPage() {
   return (
     <div className="p-6 lg:p-10 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8 fade-up">
+      <div className="flex items-center justify-between mb-6 fade-up">
         <div>
           <h1 className="font-display text-3xl lg:text-4xl" style={{ color: 'var(--stone-800)' }}>Overview</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--stone-400)' }}>Your family's financial snapshot</p>
@@ -111,6 +130,28 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Big Add Transaction Button */}
+      <button
+        onClick={() => setShowQuickAdd(true)}
+        className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl mb-6 fade-up-2 transition-all"
+        style={{
+          background: 'var(--stone-800)',
+          color: 'var(--cream)',
+          border: 'none',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          fontSize: '1rem',
+          fontWeight: '500',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = 'var(--stone-600)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'var(--stone-800)'}
+      >
+        <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
+          <Plus size={16} />
+        </div>
+        Add Transaction
+      </button>
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard icon={TrendingUp} label="Total Income" value={fmt(totalIncome)} color="var(--forest)" delay="2" />
@@ -121,7 +162,6 @@ export default function DashboardPage() {
 
       {/* Charts row */}
       <div className="grid lg:grid-cols-2 gap-6 mb-8">
-        {/* Spending by category pie */}
         <div className="p-6 rounded-2xl border fade-up-2" style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
           <h2 className="font-display text-lg mb-4" style={{ color: 'var(--stone-800)' }}>Spending by Category</h2>
           {spendingByCategory.length === 0 ? (
@@ -153,7 +193,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Budget vs actual */}
         <div className="p-6 rounded-2xl border fade-up-3" style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
           <h2 className="font-display text-lg mb-4" style={{ color: 'var(--stone-800)' }}>Budget vs Actual</h2>
           {budgetData.length === 0 ? (
@@ -203,7 +242,7 @@ export default function DashboardPage() {
       <div className="mt-6 p-6 rounded-2xl border fade-up-4" style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
         <h2 className="font-display text-lg mb-4" style={{ color: 'var(--stone-800)' }}>Recent Transactions</h2>
         {transactions.length === 0 ? (
-          <div className="text-sm py-6 text-center" style={{ color: 'var(--stone-400)' }}>No transactions this month. Add some in the Transactions tab.</div>
+          <div className="text-sm py-6 text-center" style={{ color: 'var(--stone-400)' }}>No transactions this month yet.</div>
         ) : (
           <div className="space-y-2">
             {transactions.slice(0, 8).map(t => (
@@ -225,11 +264,49 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Quick Add Modal */}
+      {showQuickAdd && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowQuickAdd(false)}>
+          <div className="w-full max-w-md rounded-2xl p-6 fade-up" style={{ background: 'var(--warm-white)' }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display text-xl" style={{ color: 'var(--stone-800)' }}>Add Transaction</h2>
+              <button onClick={() => setShowQuickAdd(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stone-400)' }}><X size={18} /></button>
+            </div>
+
+            {/* Expense / Savings toggle */}
+            <div className="flex gap-1 p-1 rounded-xl mb-4" style={{ background: 'var(--stone-100)' }}>
+              {['expense', 'savings'].map(t => (
+                <button key={t} onClick={() => setQuickForm(f => ({...f, type: t}))}
+                  className="flex-1 py-2 rounded-lg text-sm font-medium capitalize transition-all"
+                  style={{ background: quickForm.type === t ? 'var(--warm-white)' : 'transparent', color: quickForm.type === t ? 'var(--stone-800)' : 'var(--stone-400)', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {t === 'expense' ? '💸 Expense' : '🐖 Savings'}
+                </button>
+              ))}
+            </div>
+
+            <form onSubmit={handleQuickAdd} className="space-y-3">
+              <input className={inputClass} style={inputStyle} placeholder="What was it? (e.g. Whole Foods)" value={quickForm.description} onChange={e => setQuickForm(f => ({...f, description: e.target.value}))} required autoFocus />
+              <div className="grid grid-cols-2 gap-3">
+                <input className={inputClass} style={inputStyle} type="number" step="0.01" min="0" placeholder="Amount ($)" value={quickForm.amount} onChange={e => setQuickForm(f => ({...f, amount: e.target.value}))} required />
+                <input className={inputClass} style={inputStyle} type="date" value={quickForm.date} onChange={e => setQuickForm(f => ({...f, date: e.target.value}))} required />
+              </div>
+              <select className={inputClass} style={inputStyle} value={quickForm.category_id} onChange={e => setQuickForm(f => ({...f, category_id: e.target.value}))}>
+                <option value="">No category</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+              </select>
+              <button type="submit" disabled={quickSaving} className="w-full py-3.5 rounded-xl font-medium text-sm mt-1"
+                style={{ background: 'var(--stone-800)', color: 'var(--cream)', border: 'none', cursor: quickSaving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: quickSaving ? 0.7 : 1, fontSize: '0.95rem' }}>
+                {quickSaving ? 'Saving…' : 'Add Transaction'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// Inline icon to avoid import issue
 function PiggyBank2({ size, style }) {
   return <Target size={size} style={style} />
 }
