@@ -7,6 +7,19 @@ import { getTransactions, getIncome, getSavingsGoals, getCategories, addTransact
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 
+const StatCard = ({ icon: Icon, label, value, sub, color, delay }) => (
+  <div className={`p-6 rounded-2xl border fade-up-${delay}`} style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
+    <div className="flex items-start justify-between mb-4">
+      <div className="p-2 rounded-xl" style={{ background: color + '22' }}>
+        <Icon size={18} style={{ color }} />
+      </div>
+    </div>
+    <div className="font-mono text-2xl font-medium mb-1" style={{ color: 'var(--stone-800)' }}>{value}</div>
+    <div className="text-sm" style={{ color: 'var(--stone-600)' }}>{label}</div>
+    {sub && <div className="text-xs mt-1" style={{ color: 'var(--stone-400)' }}>{sub}</div>}
+  </div>
+)
+
 export default function DashboardPage() {
   const { user } = useAuth()
   const now = new Date()
@@ -89,19 +102,6 @@ export default function DashboardPage() {
 
   const inputStyle = { background: 'var(--cream)', border: '1.5px solid var(--stone-200)', color: 'var(--stone-800)', fontFamily: 'inherit' }
   const inputClass = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
-
-  const StatCard = ({ icon: Icon, label, value, sub, color, delay }) => (
-    <div className={`p-6 rounded-2xl border fade-up-${delay}`} style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
-      <div className="flex items-start justify-between mb-4">
-        <div className="p-2 rounded-xl" style={{ background: color + '22' }}>
-          <Icon size={18} style={{ color }} />
-        </div>
-      </div>
-      <div className="font-mono text-2xl font-medium mb-1" style={{ color: 'var(--stone-800)' }}>{value}</div>
-      <div className="text-sm" style={{ color: 'var(--stone-600)' }}>{label}</div>
-      {sub && <div className="text-xs mt-1" style={{ color: 'var(--stone-400)' }}>{sub}</div>}
-    </div>
-  )
 
   if (loading) return (
     <div className="p-8 flex items-center justify-center h-64">
