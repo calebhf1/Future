@@ -58,7 +58,7 @@ export default function AuthPage() {
       {/* Right panel */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-sm fade-up">
-          <div className="lg:hidden font-display text-3xl mb-8" style={{ color: 'var(--stone-800)' }}>Hearth</div>
+          <div className="lg:hidden font-display text-3xl mb-8" style={{ color: 'var(--stone-800)' }}>Future</div>
           
           <h1 className="font-display text-3xl mb-2" style={{ color: 'var(--stone-800)' }}>
             {mode === 'signin' ? 'Welcome back' : 'Create account'}
