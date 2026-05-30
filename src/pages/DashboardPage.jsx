@@ -105,7 +105,7 @@ export default function DashboardPage() {
   const budgetData = categories
     .filter(c => Number(c.budget_amount) > 0)
     .map(cat => ({
-      name: cat.name.length > 10 ? cat.name.slice(0, 10) + '…' : cat.name,
+      name: cat.name,
       budget: Number(cat.budget_amount),
       spent: transactions.filter(t => t.category_id === cat.id && t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
     }))
@@ -217,7 +217,7 @@ export default function DashboardPage() {
             <div className="h-48 flex items-center justify-center text-sm" style={{ color: 'var(--stone-400)' }}>Set budgets in Categories to see comparison</div>
           ) : (
             <div className="space-y-3">
-              {[...budgetData].sort((a, b) => b.spent - a.spent).map((row, i) => {
+              {[...budgetData].sort((a, b) => b.budget - a.budget).map((row, i) => {
                 const pct = row.budget > 0 ? Math.min(100, Math.round(row.spent / row.budget * 100)) : 0
                 const over = row.spent > row.budget
                 return (
