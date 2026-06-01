@@ -4,6 +4,11 @@ import { Plus, Trash2, Pencil, ChevronLeft, ChevronRight, X } from 'lucide-react
 import { useAuth } from '../hooks/useAuth.jsx'
 import { getTransactions, addTransaction, updateTransaction, deleteTransaction, getCategories, getIncome, upsertIncome, deleteIncome } from '../lib/supabase'
 
+const parseDate = (str) => {
+  const [y, m, d] = str.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 const inputClass = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
 const inputStyle = { background: 'var(--cream)', border: '1.5px solid var(--stone-200)', color: 'var(--stone-800)', fontFamily: 'inherit' }
@@ -20,8 +25,6 @@ export default function TransactionsPage() {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('expenses')
-
-  // Modal state — editing=null means "add new", editing=object means "edit existing"
   const [showModal, setShowModal] = useState(false)
   const [showIncomeModal, setShowIncomeModal] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -112,7 +115,6 @@ export default function TransactionsPage() {
 
   return (
     <div className="p-6 lg:p-10 max-w-4xl mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8 fade-up">
         <div>
           <h1 className="font-display text-3xl lg:text-4xl" style={{ color: 'var(--stone-800)' }}>Transactions</h1>
@@ -125,7 +127,6 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Summary */}
       <div className="grid grid-cols-2 gap-4 mb-6 fade-up-2">
         <div className="p-5 rounded-2xl border" style={{ background: 'var(--forest-muted)', borderColor: '#c8e0b8' }}>
           <div className="text-xs mb-1" style={{ color: 'var(--forest)' }}>Total Income</div>
@@ -137,7 +138,6 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Tabs + Add */}
       <div className="flex items-center justify-between mb-4 fade-up-3">
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--stone-100)' }}>
           {['expenses', 'income'].map(t => (
@@ -154,7 +154,6 @@ export default function TransactionsPage() {
         </button>
       </div>
 
-      {/* List */}
       <div className="rounded-2xl border overflow-hidden fade-up-4" style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
         {loading ? (
           <div className="p-8 text-center text-sm" style={{ color: 'var(--stone-400)' }}>Loading…</div>
@@ -173,7 +172,7 @@ export default function TransactionsPage() {
                 <div className="min-w-0">
                   <div className="text-sm font-medium truncate" style={{ color: 'var(--stone-800)' }}>{t.description}</div>
                   <div className="text-xs" style={{ color: 'var(--stone-400)' }}>
-                    {t.budget_categories?.name || 'Uncategorized'} · {format(new Date(t.date), 'MMM d, yyyy')}
+                    {t.budget_categories?.name || 'Uncategorized'} · {format(parseDate(t.date), 'MMM d, yyyy')}
                   </div>
                 </div>
               </div>
@@ -220,7 +219,6 @@ export default function TransactionsPage() {
         )}
       </div>
 
-      {/* Add / Edit Expense Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowModal(false)}>
           <div className="w-full max-w-md rounded-2xl p-6 fade-up" style={{ background: 'var(--warm-white)' }} onClick={e => e.stopPropagation()}>
@@ -232,7 +230,7 @@ export default function TransactionsPage() {
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Description</label>
                 <input className={inputClass} style={inputStyle} placeholder="What was it? (e.g. Whole Foods)"
-                  value={quickForm.description} onChange={e => setQuickForm(f => ({...f, description: e.target.value}))}
+                  value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))}
                   required autoFocus
                   autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false" />
               </div>
@@ -266,7 +264,6 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      {/* Add Income Modal */}
       {showIncomeModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowIncomeModal(false)}>
           <div className="w-full max-w-md rounded-2xl p-6 fade-up" style={{ background: 'var(--warm-white)' }} onClick={e => e.stopPropagation()}>
