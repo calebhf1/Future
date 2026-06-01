@@ -129,7 +129,6 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between mb-6 fade-up">
         <div>
           <h1 className="font-display text-3xl lg:text-4xl" style={{ color: 'var(--stone-800)' }}>Overview</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--stone-400)' }}>Your family's financial snapshot</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={prevMonth} className="p-2 rounded-xl border" style={{ border: '1px solid var(--stone-200)', background: 'var(--warm-white)', cursor: 'pointer', color: 'var(--stone-600)' }}
