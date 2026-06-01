@@ -5,7 +5,7 @@ import { getCategories, upsertCategory, deleteCategory } from '../lib/supabase'
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 
-const CATEGORY_ICONS = ['🛒', '🍔', '🏠', '🚗', '💊', '👕', '🎬', '✈️', '📱', '⚡', '💧', '🐾', '👶', '🎓', '💪', '☕', '🎁', '🔧', '💅', '🎮', '🚲', '☕', '🍽️', '🍝', '🧋']
+const CATEGORY_ICONS = ['🛒', '🍔', '🏠', '🚗', '💊', '👕', '🎬', '✈️', '📱', '⚡', '💧', '🐾', '👶', '🎓', '💪', '☕', '🎁', '🔧', '💅', '🎮', '🚲', '☕', '🍽️', '🍝', '🧋', '🧘‍♀️']
 const CATEGORY_COLORS = [
   '#2D5016', '#C4511A', '#B8860B', '#6B8F6B', '#3D2E25',
   '#8B4513', '#4A7C28', '#D2691E', '#556B2F', '#8B6914',
