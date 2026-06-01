@@ -178,7 +178,7 @@ export default function TransactionsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                <div className="font-mono text-sm font-medium" style={{ color: 'var(--rust)' }}>-{fmt(t.amount)}</div>
+                <div className="font-mono text-sm font-medium" style={{ color: 'var(--rust)' }}>-${Number(t.amount).toFixed(2)}</div>
                 <button onClick={() => openEdit(t)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg"
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stone-400)' }}
                   onMouseEnter={e => e.currentTarget.style.color = 'var(--stone-800)'}
