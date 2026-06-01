@@ -36,9 +36,9 @@ export default function AuthPage() {
         </div>
         <div>
           <blockquote className="font-display text-2xl text-white leading-relaxed mb-6">
-            "A budget is telling your money where to go instead of wondering where it went."
+            "Beware of small expenses; a small leak will sink a great ship."
           </blockquote>
-          <cite style={{ color: 'var(--stone-400)', fontSize: '0.85rem' }}>— Dave Ramsey</cite>
+          <cite style={{ color: 'var(--stone-400)', fontSize: '0.85rem' }}>— Ben Franklin</cite>
         </div>
         <div className="grid grid-cols-2 gap-4">
           {[
