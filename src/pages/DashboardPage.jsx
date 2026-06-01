@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { format, subMonths } from 'date-fns'
-import { TrendingDown, DollarSign, Target, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
+import { TrendingDown, DollarSign, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { getTransactions, getIncome, getSavingsGoals, getCategories, addTransaction } from '../lib/supabase'
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
+const fmtCents = (n) => `$${Number(n).toFixed(2)}`
 const inputStyle = { background: 'var(--cream)', border: '1.5px solid var(--stone-200)', color: 'var(--stone-800)', fontFamily: 'inherit' }
 const inputClass = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
+const PIE_COLORS = ['#2D5016','#C4511A','#1A6B8A','#8B4513','#4A235A','#1A4A3A','#8B6914','#5C1A1A','#1A3A6B','#4A5C1A']
 
 const StatCard = ({ icon: Icon, label, value, sub, color, delay }) => (
   <div className={`p-5 rounded-2xl border fade-up-${delay}`} style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
@@ -19,6 +21,64 @@ const StatCard = ({ icon: Icon, label, value, sub, color, delay }) => (
     {sub && <div className="text-xs mt-0.5" style={{ color: 'var(--stone-400)' }}>{sub}</div>}
   </div>
 )
+
+// Drawer showing transactions for a selected category
+const CategoryDrawer = ({ category, transactions, onClose }) => {
+  const catTxs = transactions
+    .filter(t => t.category_id === category.id && t.type === 'expense')
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+  const total = catTxs.reduce((s, t) => s + Number(t.amount), 0)
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={onClose} />
+      {/* Drawer */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl overflow-hidden"
+        style={{ background: 'var(--warm-white)', maxHeight: '75vh', display: 'flex', flexDirection: 'column' }}>
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 rounded-full" style={{ background: 'var(--stone-300)' }} />
+        </div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--stone-200)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+              style={{ background: category.color + '22' }}>{category.icon || '📦'}</div>
+            <div>
+              <div className="font-display text-lg" style={{ color: 'var(--stone-800)' }}>{category.name}</div>
+              <div className="text-xs" style={{ color: 'var(--stone-400)' }}>{catTxs.length} transaction{catTxs.length !== 1 ? 's' : ''} · {fmt(total)} total</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stone-400)' }}>
+            <X size={20} />
+          </button>
+        </div>
+        {/* Transaction list */}
+        <div className="overflow-y-auto flex-1 px-6 py-3">
+          {catTxs.length === 0 ? (
+            <div className="py-10 text-center text-sm" style={{ color: 'var(--stone-400)' }}>No transactions this month</div>
+          ) : (
+            <div>
+              {catTxs.map((t, i) => (
+                <div key={t.id} className="flex items-center justify-between py-3 border-b last:border-0" style={{ borderColor: 'var(--stone-100)' }}>
+                  <div>
+                    <div className="text-sm font-medium" style={{ color: 'var(--stone-800)' }}>{t.description}</div>
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--stone-400)' }}>{format(new Date(t.date), 'EEEE, MMM d')}</div>
+                    {t.notes && <div className="text-xs mt-0.5" style={{ color: 'var(--stone-400)' }}>{t.notes}</div>}
+                  </div>
+                  <div className="font-mono text-sm font-medium ml-4 flex-shrink-0" style={{ color: 'var(--rust)' }}>
+                    -{fmtCents(t.amount)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -34,16 +94,15 @@ export default function DashboardPage() {
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [quickForm, setQuickForm] = useState({ description: '', amount: '', category_id: '', date: format(new Date(), 'yyyy-MM-dd') })
   const [quickSaving, setQuickSaving] = useState(false)
+  const [drawerCategory, setDrawerCategory] = useState(null) // category object or null
 
   const load = useCallback(async () => {
     if (!user) return
     setLoading(true)
-
     const months = Array.from({ length: 5 }, (_, i) => {
       const d = subMonths(new Date(year, month - 1, 1), i)
       return { month: d.getMonth() + 1, year: d.getFullYear(), label: format(d, 'MMM') }
     })
-
     const [txRes, incRes, goalRes, catRes, ...historyRes] = await Promise.all([
       getTransactions(user.id, month, year),
       getIncome(user.id, month, year),
@@ -51,18 +110,15 @@ export default function DashboardPage() {
       getCategories(user.id),
       ...months.map(m => getTransactions(user.id, m.month, m.year)),
     ])
-
     setTransactions(txRes.data || [])
     setIncome(incRes.data || [])
     setGoals(goalRes.data || [])
     setCategories(catRes.data || [])
-
     const compare = months.map((m, i) => {
       const txs = historyRes[i].data || []
       const spent = txs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
       return { label: m.label, spent }
     }).reverse()
-
     setCompareData(compare)
     setLoading(false)
   }, [user, month, year])
@@ -90,12 +146,16 @@ export default function DashboardPage() {
     setQuickSaving(false)
   }
 
+  const openDrawer = (categoryName) => {
+    const cat = categories.find(c => c.name === categoryName)
+    if (cat) setDrawerCategory(cat)
+  }
+
   const totalSpent = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
   const totalBudget = categories.reduce((s, c) => s + Number(c.budget_amount || 0), 0)
   const totalGoalTarget = goals.reduce((s, g) => s + Number(g.target_amount), 0)
   const totalGoalSaved = goals.reduce((s, g) => s + Number(g.current_amount), 0)
 
-  const PIE_COLORS = ['#2D5016','#C4511A','#1A6B8A','#8B4513','#4A235A','#1A4A3A','#8B6914','#5C1A1A','#1A3A6B','#4A5C1A']
   const spendingByCategory = categories.map((cat, i) => {
     const spent = transactions.filter(t => t.category_id === cat.id && t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
     return { name: cat.name, value: spent, color: PIE_COLORS[i % PIE_COLORS.length] }
@@ -104,7 +164,9 @@ export default function DashboardPage() {
   const budgetData = categories
     .filter(c => Number(c.budget_amount) > 0)
     .map(cat => ({
+      id: cat.id,
       name: cat.name,
+      icon: cat.icon,
       color: cat.color || '#6B5B4E',
       budget: Number(cat.budget_amount),
       spent: transactions.filter(t => t.category_id === cat.id && t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
@@ -114,7 +176,6 @@ export default function DashboardPage() {
   const prevMonth = () => { if (month === 1) { setMonth(12); setYear(y => y-1) } else setMonth(m => m-1) }
   const nextMonth = () => { if (month === 12) { setMonth(1); setYear(y => y+1) } else setMonth(m => m+1) }
   const monthLabel = format(new Date(year, month - 1, 1), 'MMMM yyyy')
-
   const compareMax = Math.max(...compareData.map(d => d.spent), 1)
 
   if (loading) return (
@@ -129,6 +190,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between mb-6 fade-up">
         <div>
           <h1 className="font-display text-3xl lg:text-4xl" style={{ color: 'var(--stone-800)' }}>Overview</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--stone-400)' }}>Your family's financial snapshot</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={prevMonth} className="p-2 rounded-xl border" style={{ border: '1px solid var(--stone-200)', background: 'var(--warm-white)', cursor: 'pointer', color: 'var(--stone-600)' }}
@@ -143,7 +205,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Add Expense button */}
+      {/* Add Expense */}
       <div className="mb-6 fade-up-2">
         <button onClick={openQuickAdd} className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-medium transition-all"
           style={{ background: 'var(--stone-800)', color: 'var(--cream)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95rem' }}
@@ -152,7 +214,7 @@ export default function DashboardPage() {
         ><Plus size={16} /> Add Expense</button>
       </div>
 
-      {/* Stats — Spent + Budget Left only */}
+      {/* Stats */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         <StatCard icon={TrendingDown} label="Spent" value={fmt(totalSpent)}
           sub={totalBudget > 0 ? `${Math.round(totalSpent / totalBudget * 100)}% of budget` : ''}
@@ -162,22 +224,27 @@ export default function DashboardPage() {
           color={totalSpent <= totalBudget ? 'var(--forest)' : 'var(--rust)'} delay="3" />
       </div>
 
-      {/* Budget vs Actual */}
+      {/* Budget vs Actual — clickable rows */}
       <div className="p-6 rounded-2xl border mb-6 fade-up-2" style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
         <h2 className="font-display text-lg mb-1" style={{ color: 'var(--stone-800)' }}>Budget vs Actual</h2>
         <div className="flex items-center gap-4 mb-4 text-xs" style={{ color: 'var(--stone-400)' }}>
           <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 rounded-full" style={{ background: 'var(--stone-300)' }} /> Budget</div>
           <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 rounded-full" style={{ background: 'var(--stone-800)' }} /> Spent</div>
+          <div className="ml-auto text-xs" style={{ color: 'var(--stone-400)' }}>Tap a row to see transactions</div>
         </div>
         {budgetData.length === 0 ? (
           <div className="py-8 text-center text-sm" style={{ color: 'var(--stone-400)' }}>Set budgets in Categories to see comparison</div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-1">
             {budgetData.map((row, i) => {
               const spentPct = row.budget > 0 ? Math.min(100, (row.spent / row.budget) * 100) : 0
               const over = row.spent > row.budget
               return (
-                <div key={i}>
+                <button key={i} onClick={() => openDrawer(row.name)} className="w-full text-left p-3 rounded-xl transition-all"
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--stone-100)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
                   <div className="flex items-center justify-between text-xs mb-1.5">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{ background: row.color }} />
@@ -191,14 +258,14 @@ export default function DashboardPage() {
                     <div className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
                       style={{ width: spentPct + '%', background: over ? 'var(--rust)' : row.color, opacity: 0.85 }} />
                   </div>
-                </div>
+                </button>
               )
             })}
           </div>
         )}
       </div>
 
-      {/* Monthly Comparison — expenses only */}
+      {/* Monthly Expenses */}
       <div className="p-6 rounded-2xl border mb-6 fade-up-3" style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
         <h2 className="font-display text-lg mb-1" style={{ color: 'var(--stone-800)' }}>Monthly Expenses</h2>
         <div className="flex items-center gap-4 mb-5 text-xs" style={{ color: 'var(--stone-400)' }}>
@@ -224,14 +291,23 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Spending breakdown pie */}
+      {/* Spending breakdown pie — clickable segments + legend */}
       {spendingByCategory.length > 0 && (
         <div className="p-6 rounded-2xl border mb-6 fade-up-3" style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
-          <h2 className="font-display text-lg mb-4" style={{ color: 'var(--stone-800)' }}>Spending Breakdown</h2>
+          <h2 className="font-display text-lg mb-1" style={{ color: 'var(--stone-800)' }}>Spending Breakdown</h2>
+          <p className="text-xs mb-4" style={{ color: 'var(--stone-400)' }}>Tap a segment or category to see transactions</p>
           <div className="flex items-center gap-6">
             <ResponsiveContainer width={140} height={140}>
               <PieChart>
-                <Pie data={spendingByCategory} cx="50%" cy="50%" innerRadius={40} outerRadius={68} paddingAngle={3} dataKey="value">
+                <Pie
+                  data={spendingByCategory}
+                  cx="50%" cy="50%"
+                  innerRadius={40} outerRadius={68}
+                  paddingAngle={3}
+                  dataKey="value"
+                  onClick={(entry) => openDrawer(entry.name)}
+                  style={{ cursor: 'pointer' }}
+                >
                   {spendingByCategory.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                 </Pie>
                 <Tooltip formatter={(v) => fmt(v)} />
@@ -239,13 +315,18 @@ export default function DashboardPage() {
             </ResponsiveContainer>
             <div className="flex-1 space-y-2">
               {spendingByCategory.slice(0, 7).map((c, i) => (
-                <div key={i} className="flex items-center justify-between text-xs">
+                <button key={i} onClick={() => openDrawer(c.name)}
+                  className="w-full flex items-center justify-between text-xs p-1.5 rounded-lg transition-all"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--stone-100)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.color }} />
                     <span style={{ color: 'var(--stone-600)' }}>{c.name}</span>
                   </div>
                   <span className="font-mono font-medium" style={{ color: 'var(--stone-800)' }}>{fmt(c.value)}</span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -296,12 +377,21 @@ export default function DashboardPage() {
                     <div className="text-xs" style={{ color: 'var(--stone-400)' }}>{t.budget_categories?.name || 'Uncategorized'} · {format(new Date(t.date), 'MMM d')}</div>
                   </div>
                 </div>
-                <div className="font-mono text-sm font-medium" style={{ color: 'var(--rust)' }}>-${Number(t.amount).toFixed(2)}</div>
+                <div className="font-mono text-sm font-medium" style={{ color: 'var(--rust)' }}>-{fmtCents(t.amount)}</div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Category Drawer */}
+      {drawerCategory && (
+        <CategoryDrawer
+          category={drawerCategory}
+          transactions={transactions}
+          onClose={() => setDrawerCategory(null)}
+        />
+      )}
 
       {/* Quick Add Modal */}
       {showQuickAdd && (
