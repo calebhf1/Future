@@ -46,13 +46,15 @@ export const deleteCategory = async (id) => {
 // ── Transactions ──────────────────────────────────────────────────
 export const getTransactions = async (userId, month, year) => {
   const from = `${year}-${String(month).padStart(2, '0')}-01`
-  const to = `${year}-${String(month).padStart(2, '0')}-31`
+  const nextMonth = month === 12 ? 1 : month + 1
+  const nextYear = month === 12 ? year + 1 : year
+  const to = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
   const { data, error } = await supabase
     .from('transactions')
     .select('*, budget_categories(name, color, icon)')
     .eq('user_id', userId)
     .gte('date', from)
-    .lte('date', to)
+    .lt('date', to)
     .order('date', { ascending: false })
   return { data, error }
 }
@@ -131,4 +133,79 @@ export const upsertSavingsGoal = async (goal) => {
 export const deleteSavingsGoal = async (id) => {
   const { error } = await supabase.from('savings_goals').delete().eq('id', id)
   return { error }
+}
+
+// ── Recurring Transactions ────────────────────────────────────────
+export const getRecurringTransactions = async (userId) => {
+  const { data, error } = await supabase
+    .from('recurring_transactions')
+    .select('*, budget_categories(name, color, icon)')
+    .eq('user_id', userId)
+    .eq('active', true)
+    .order('created_at')
+  return { data, error }
+}
+
+export const addRecurringTransaction = async (tx) => {
+  const { data, error } = await supabase
+    .from('recurring_transactions')
+    .insert(tx)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const deleteRecurringTransaction = async (id) => {
+  const { error } = await supabase
+    .from('recurring_transactions')
+    .update({ active: false })
+    .eq('id', id)
+  return { error }
+}
+
+// Check if a recurring transaction has already been posted for a given month/year
+export const getPostedRecurring = async (userId, month, year) => {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('recurring_id')
+    .eq('user_id', userId)
+    .not('recurring_id', 'is', null)
+    .gte('date', `${year}-${String(month).padStart(2,'0')}-01`)
+    .lt('date', `${month === 12 ? year+1 : year}-${String(month === 12 ? 1 : month+1).padStart(2,'0')}-01`)
+  return { data, error }
+}
+
+// Auto-post any recurring transactions due this month that haven't been posted yet
+export const syncRecurringTransactions = async (userId, month, year) => {
+  const { data: recurring } = await getRecurringTransactions(userId)
+  if (!recurring?.length) return
+
+  const { data: posted } = await getPostedRecurring(userId, month, year)
+  const postedIds = new Set((posted || []).map(p => p.recurring_id))
+
+  const now = new Date(year, month - 1, 1)
+  const toPost = recurring.filter(r => {
+    if (postedIds.has(r.id)) return false
+    // Check if this recurring tx is due this month based on frequency + start date
+    const start = new Date(r.start_date)
+    if (start > new Date(year, month - 1, 28)) return false
+    if (r.frequency === 'monthly') return true
+    if (r.frequency === 'weekly' || r.frequency === 'biweekly') return true
+    return false
+  })
+
+  for (const r of toPost) {
+    const day = new Date(r.start_date).getDate()
+    const date = `${year}-${String(month).padStart(2,'0')}-${String(Math.min(day, 28)).padStart(2,'0')}`
+    await addTransaction({
+      description: r.description,
+      amount: r.amount,
+      date,
+      type: 'expense',
+      category_id: r.category_id,
+      user_id: userId,
+      recurring_id: r.id,
+      notes: `Auto-posted (${r.frequency})`,
+    })
+  }
 }
