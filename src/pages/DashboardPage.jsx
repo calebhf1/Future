@@ -15,6 +15,30 @@ const inputStyle = { background: 'var(--cream)', border: '1.5px solid var(--ston
 const inputClass = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
 const PIE_COLORS = ['#2D5016','#C4511A','#1A6B8A','#8B4513','#4A235A','#1A4A3A','#8B6914','#5C1A1A','#1A3A6B','#4A5C1A']
 
+const PAID_BY_OPTIONS = [
+  { value: 'both', label: '👫 Both' },
+  { value: 'caleb', label: '👤 Caleb' },
+  { value: 'lily', label: '👤 Lily' },
+]
+
+const PaidByToggle = ({ value, onChange }) => (
+  <div className="flex gap-2">
+    {PAID_BY_OPTIONS.map(opt => (
+      <button key={opt.value} type="button" onClick={() => onChange(opt.value)}
+        className="flex-1 py-2 rounded-xl text-xs font-medium transition-all"
+        style={{
+          border: '1.5px solid',
+          borderColor: value === opt.value ? 'var(--stone-800)' : 'var(--stone-200)',
+          background: value === opt.value ? 'var(--stone-800)' : 'transparent',
+          color: value === opt.value ? 'var(--cream)' : 'var(--stone-500)',
+          cursor: 'pointer', fontFamily: 'inherit'
+        }}>
+        {opt.label}
+      </button>
+    ))}
+  </div>
+)
+
 const StatCard = ({ icon: Icon, label, value, sub, color, delay }) => (
   <div className={`p-5 rounded-2xl border fade-up-${delay}`} style={{ background: 'var(--warm-white)', borderColor: 'var(--stone-200)' }}>
     <div className="p-2 rounded-xl inline-block mb-3" style={{ background: color + '22' }}>
@@ -31,6 +55,10 @@ const CategoryDrawer = ({ category, transactions, onClose }) => {
     .filter(t => t.category_id === category.id && t.type === 'expense')
     .sort((a, b) => parseDate(b.date) - parseDate(a.date))
   const total = catTxs.reduce((s, t) => s + Number(t.amount), 0)
+  const bothTotal = catTxs.filter(t => !t.paid_by || t.paid_by === 'both').reduce((s, t) => s + Number(t.amount), 0)
+  const calebTotal = catTxs.filter(t => t.paid_by === 'caleb').reduce((s, t) => s + Number(t.amount), 0)
+  const lilyTotal = catTxs.filter(t => t.paid_by === 'lily').reduce((s, t) => s + Number(t.amount), 0)
+  const hasSplit = calebTotal > 0 || lilyTotal > 0
 
   return (
     <>
@@ -53,6 +81,25 @@ const CategoryDrawer = ({ category, transactions, onClose }) => {
             <X size={20} />
           </button>
         </div>
+
+        {/* Per-person breakdown */}
+        {hasSplit && (
+          <div className="flex gap-3 px-6 py-3 border-b flex-shrink-0 text-xs" style={{ borderColor: 'var(--stone-100)' }}>
+            <div className="flex-1 text-center p-2 rounded-xl" style={{ background: 'var(--stone-100)' }}>
+              <div style={{ color: 'var(--stone-400)' }}>👫 Both</div>
+              <div className="font-mono font-medium mt-0.5" style={{ color: 'var(--stone-800)' }}>{fmt(bothTotal)}</div>
+            </div>
+            <div className="flex-1 text-center p-2 rounded-xl" style={{ background: 'var(--stone-100)' }}>
+              <div style={{ color: 'var(--stone-400)' }}>Caleb</div>
+              <div className="font-mono font-medium mt-0.5" style={{ color: 'var(--stone-800)' }}>{fmt(calebTotal)}</div>
+            </div>
+            <div className="flex-1 text-center p-2 rounded-xl" style={{ background: 'var(--stone-100)' }}>
+              <div style={{ color: 'var(--stone-400)' }}>Lily</div>
+              <div className="font-mono font-medium mt-0.5" style={{ color: 'var(--stone-800)' }}>{fmt(lilyTotal)}</div>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-y-auto flex-1 px-6 py-3">
           {catTxs.length === 0 ? (
             <div className="py-10 text-center text-sm" style={{ color: 'var(--stone-400)' }}>No transactions this month</div>
@@ -61,7 +108,14 @@ const CategoryDrawer = ({ category, transactions, onClose }) => {
               {catTxs.map((t) => (
                 <div key={t.id} className="flex items-center justify-between py-3 border-b last:border-0" style={{ borderColor: 'var(--stone-100)' }}>
                   <div>
-                    <div className="text-sm font-medium" style={{ color: 'var(--stone-800)' }}>{t.description}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm font-medium" style={{ color: 'var(--stone-800)' }}>{t.description}</div>
+                      {t.paid_by && t.paid_by !== 'both' && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-md" style={{ background: 'var(--stone-100)', color: 'var(--stone-500)' }}>
+                          {t.paid_by === 'caleb' ? 'Caleb' : 'Lily'}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs mt-0.5" style={{ color: 'var(--stone-400)' }}>{format(parseDate(t.date), 'EEEE, MMM d')}</div>
                     {t.notes && <div className="text-xs mt-0.5" style={{ color: 'var(--stone-400)' }}>{t.notes}</div>}
                   </div>
@@ -90,7 +144,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [compareData, setCompareData] = useState([])
   const [showQuickAdd, setShowQuickAdd] = useState(false)
-  const [quickForm, setQuickForm] = useState({ description: '', amount: '', category_id: '', date: format(new Date(), 'yyyy-MM-dd') })
+  const [quickForm, setQuickForm] = useState({ description: '', amount: '', category_id: '', date: format(new Date(), 'yyyy-MM-dd'), paid_by: 'both' })
   const [quickSaving, setQuickSaving] = useState(false)
   const [drawerCategory, setDrawerCategory] = useState(null)
 
@@ -124,7 +178,7 @@ export default function DashboardPage() {
   useEffect(() => { load() }, [load])
 
   const openQuickAdd = () => {
-    setQuickForm({ description: '', amount: '', category_id: '', date: format(new Date(), 'yyyy-MM-dd') })
+    setQuickForm({ description: '', amount: '', category_id: '', date: format(new Date(), 'yyyy-MM-dd'), paid_by: 'both' })
     setShowQuickAdd(true)
   }
 
@@ -137,6 +191,7 @@ export default function DashboardPage() {
       date: quickForm.date,
       type: 'expense',
       category_id: quickForm.category_id || null,
+      paid_by: quickForm.paid_by,
       user_id: user.id,
     })
     setShowQuickAdd(false)
@@ -162,10 +217,7 @@ export default function DashboardPage() {
   const budgetData = categories
     .filter(c => Number(c.budget_amount) > 0)
     .map(cat => ({
-      id: cat.id,
-      name: cat.name,
-      icon: cat.icon,
-      color: cat.color || '#6B5B4E',
+      id: cat.id, name: cat.name, icon: cat.icon, color: cat.color || '#6B5B4E',
       budget: Number(cat.budget_amount),
       spent: transactions.filter(t => t.category_id === cat.id && t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
     }))
@@ -185,9 +237,7 @@ export default function DashboardPage() {
   return (
     <div className="p-6 lg:p-10 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6 fade-up">
-        <div>
-          <h1 className="font-display text-3xl lg:text-4xl" style={{ color: 'var(--stone-800)' }}>Overview</h1>
-        </div>
+        <h1 className="font-display text-3xl lg:text-4xl" style={{ color: 'var(--stone-800)' }}>Overview</h1>
         <div className="flex items-center gap-2">
           <button onClick={prevMonth} className="p-2 rounded-xl border" style={{ border: '1px solid var(--stone-200)', background: 'var(--warm-white)', cursor: 'pointer', color: 'var(--stone-600)' }}
             onMouseEnter={e => e.currentTarget.style.background = 'var(--stone-100)'}
@@ -356,7 +406,14 @@ export default function DashboardPage() {
                     {t.budget_categories?.icon || '💸'}
                   </div>
                   <div>
-                    <div className="text-sm font-medium" style={{ color: 'var(--stone-800)' }}>{t.description}</div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-sm font-medium" style={{ color: 'var(--stone-800)' }}>{t.description}</div>
+                      {t.paid_by && t.paid_by !== 'both' && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-md" style={{ background: 'var(--stone-100)', color: 'var(--stone-500)' }}>
+                          {t.paid_by === 'caleb' ? 'Caleb' : 'Lily'}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs" style={{ color: 'var(--stone-400)' }}>{t.budget_categories?.name || 'Uncategorized'} · {format(parseDate(t.date), 'MMM d')}</div>
                   </div>
                 </div>
@@ -381,8 +438,7 @@ export default function DashboardPage() {
             <form onSubmit={handleQuickAdd} className="space-y-3">
               <input className={inputClass} style={inputStyle} placeholder="What was it? (e.g. Whole Foods)"
                 value={quickForm.description} onChange={e => setQuickForm(f => ({...f, description: e.target.value}))}
-                required autoFocus
-                autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false" />
+                required autoFocus autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false" />
               <div className="grid grid-cols-2 gap-3">
                 <input className={inputClass} style={inputStyle} type="number" step="0.01" min="0" placeholder="Amount ($)"
                   value={quickForm.amount} onChange={e => setQuickForm(f => ({...f, amount: e.target.value}))} required />
@@ -394,6 +450,7 @@ export default function DashboardPage() {
                 <option value="">No category</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
               </select>
+              <PaidByToggle value={quickForm.paid_by} onChange={v => setQuickForm(f => ({...f, paid_by: v}))} />
               <button type="submit" disabled={quickSaving} className="w-full py-3.5 rounded-xl font-medium"
                 style={{ background: 'var(--stone-800)', color: 'white', border: 'none',
                   cursor: quickSaving ? 'not-allowed' : 'pointer', fontFamily: 'inherit',

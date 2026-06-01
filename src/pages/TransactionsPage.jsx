@@ -13,7 +13,31 @@ const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency:
 const inputClass = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
 const inputStyle = { background: 'var(--cream)', border: '1.5px solid var(--stone-200)', color: 'var(--stone-800)', fontFamily: 'inherit' }
 
-const emptyForm = () => ({ description: '', amount: '', category_id: '', date: format(new Date(), 'yyyy-MM-dd'), notes: '' })
+const PAID_BY_OPTIONS = [
+  { value: 'both', label: '👫 Both' },
+  { value: 'caleb', label: '👤 Caleb' },
+  { value: 'lily', label: '👤 Lily' },
+]
+
+const PaidByToggle = ({ value, onChange }) => (
+  <div className="flex gap-2">
+    {PAID_BY_OPTIONS.map(opt => (
+      <button key={opt.value} type="button" onClick={() => onChange(opt.value)}
+        className="flex-1 py-2 rounded-xl text-xs font-medium transition-all"
+        style={{
+          border: '1.5px solid',
+          borderColor: value === opt.value ? 'var(--stone-800)' : 'var(--stone-200)',
+          background: value === opt.value ? 'var(--stone-800)' : 'transparent',
+          color: value === opt.value ? 'var(--cream)' : 'var(--stone-500)',
+          cursor: 'pointer', fontFamily: 'inherit'
+        }}>
+        {opt.label}
+      </button>
+    ))}
+  </div>
+)
+
+const emptyForm = () => ({ description: '', amount: '', category_id: '', date: format(new Date(), 'yyyy-MM-dd'), notes: '', paid_by: 'both' })
 
 export default function TransactionsPage() {
   const { user } = useAuth()
@@ -75,6 +99,7 @@ export default function TransactionsPage() {
       date: form.date,
       category_id: form.category_id || null,
       notes: form.notes,
+      paid_by: form.paid_by || 'both',
     }
     if (editing) {
       await updateTransaction(editing.id, payload)
@@ -255,6 +280,7 @@ export default function TransactionsPage() {
                 <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Notes (optional)</label>
                 <input className={inputClass} style={inputStyle} placeholder="Any notes…" value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} />
               </div>
+              <PaidByToggle value={form.paid_by} onChange={v => setForm(f => ({...f, paid_by: v}))} />
               <button type="submit" disabled={saving} className="w-full py-3 rounded-xl text-sm font-medium"
                 style={{ background: 'var(--stone-800)', color: 'var(--cream)', border: 'none', cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Expense'}
