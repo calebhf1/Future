@@ -95,9 +95,10 @@ export default function DashboardPage() {
   const totalGoalTarget = goals.reduce((s, g) => s + Number(g.target_amount), 0)
   const totalGoalSaved = goals.reduce((s, g) => s + Number(g.current_amount), 0)
 
-  const spendingByCategory = categories.map(cat => {
+  const PIE_COLORS = ['#2D5016','#C4511A','#1A6B8A','#8B4513','#4A235A','#1A4A3A','#8B6914','#5C1A1A','#1A3A6B','#4A5C1A']
+  const spendingByCategory = categories.map((cat, i) => {
     const spent = transactions.filter(t => t.category_id === cat.id && t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
-    return { name: cat.name, value: spent, color: cat.color || '#6B5B4E' }
+    return { name: cat.name, value: spent, color: PIE_COLORS[i % PIE_COLORS.length] }
   }).filter(c => c.value > 0)
 
   const budgetData = categories
@@ -296,7 +297,7 @@ export default function DashboardPage() {
                     <div className="text-xs" style={{ color: 'var(--stone-400)' }}>{t.budget_categories?.name || 'Uncategorized'} · {format(new Date(t.date), 'MMM d')}</div>
                   </div>
                 </div>
-                <div className="font-mono text-sm font-medium" style={{ color: 'var(--rust)' }}>-{fmt(t.amount)}</div>
+                <div className="font-mono text-sm font-medium" style={{ color: 'var(--rust)' }}>-${Number(t.amount).toFixed(2)}</div>
               </div>
             ))}
           </div>
