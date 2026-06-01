@@ -12,7 +12,7 @@ function ProtectedRoute({ children }) {
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--cream)' }}>
       <div className="text-center">
-        <div className="font-display text-3xl mb-2" style={{ color: 'var(--stone-800)' }}>Hearth</div>
+        <div className="font-display text-3xl mb-2" style={{ color: 'var(--stone-800)' }}>Future</div>
         <div className="text-sm" style={{ color: 'var(--stone-400)' }}>Loading...</div>
       </div>
     </div>
