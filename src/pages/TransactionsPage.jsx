@@ -1,10 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { format } from 'date-fns'
-import { Plus, Trash2, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Plus, Trash2, Pencil, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { getTransactions, addTransaction, deleteTransaction, getCategories, getIncome, upsertIncome, deleteIncome } from '../lib/supabase'
+import { getTransactions, addTransaction, updateTransaction, deleteTransaction, getCategories, getIncome, upsertIncome, deleteIncome } from '../lib/supabase'
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
+const inputClass = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
+const inputStyle = { background: 'var(--cream)', border: '1.5px solid var(--stone-200)', color: 'var(--stone-800)', fontFamily: 'inherit' }
+
+const emptyForm = () => ({ description: '', amount: '', category_id: '', date: format(new Date(), 'yyyy-MM-dd'), notes: '' })
 
 export default function TransactionsPage() {
   const { user } = useAuth()
@@ -15,10 +19,13 @@ export default function TransactionsPage() {
   const [income, setIncome] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState('expenses')
+
+  // Modal state — editing=null means "add new", editing=object means "edit existing"
   const [showModal, setShowModal] = useState(false)
   const [showIncomeModal, setShowIncomeModal] = useState(false)
-  const [tab, setTab] = useState('expenses') // expenses | income
-  const [form, setForm] = useState({ description: '', amount: '', category_id: '', date: format(new Date(), 'yyyy-MM-dd'), type: 'expense', notes: '' })
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState(emptyForm())
   const [incomeForm, setIncomeForm] = useState({ source: '', amount: '', notes: '' })
   const [saving, setSaving] = useState(false)
 
@@ -38,17 +45,40 @@ export default function TransactionsPage() {
 
   useEffect(() => { load() }, [load])
 
-  const handleAddTx = async (e) => {
+  const openAdd = () => {
+    setEditing(null)
+    setForm(emptyForm())
+    setShowModal(true)
+  }
+
+  const openEdit = (t) => {
+    setEditing(t)
+    setForm({
+      description: t.description,
+      amount: t.amount,
+      category_id: t.category_id || '',
+      date: t.date,
+      notes: t.notes || '',
+    })
+    setShowModal(true)
+  }
+
+  const handleSaveTx = async (e) => {
     e.preventDefault()
     setSaving(true)
-    await addTransaction({
-      ...form,
+    const payload = {
+      description: form.description,
       amount: parseFloat(form.amount),
-      user_id: user.id,
+      date: form.date,
       category_id: form.category_id || null,
-    })
+      notes: form.notes,
+    }
+    if (editing) {
+      await updateTransaction(editing.id, payload)
+    } else {
+      await addTransaction({ ...payload, type: 'expense', user_id: user.id })
+    }
     setShowModal(false)
-    setForm({ description: '', amount: '', category_id: '', date: format(new Date(), 'yyyy-MM-dd'), type: 'expense', notes: '' })
     await load()
     setSaving(false)
   }
@@ -80,26 +110,6 @@ export default function TransactionsPage() {
   const totalIncome = income.reduce((s, i) => s + Number(i.amount), 0)
   const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
 
-  const inputClass = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
-  const inputStyle = { background: 'var(--cream)', border: '1.5px solid var(--stone-200)', color: 'var(--stone-800)', fontFamily: 'inherit' }
-
-  const Modal = ({ title, onClose, onSubmit, children }) => (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl p-6 fade-up" style={{ background: 'var(--warm-white)' }} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-display text-xl" style={{ color: 'var(--stone-800)' }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stone-400)' }}><X size={18} /></button>
-        </div>
-        <form onSubmit={onSubmit} className="space-y-4">
-          {children}
-          <button type="submit" disabled={saving} className="w-full py-3 rounded-xl text-sm font-medium" style={{ background: 'var(--stone-800)', color: 'var(--cream)', border: 'none', cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>
-            {saving ? 'Saving…' : 'Add'}
-          </button>
-        </form>
-      </div>
-    </div>
-  )
-
   return (
     <div className="p-6 lg:p-10 max-w-4xl mx-auto">
       {/* Header */}
@@ -115,7 +125,7 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Summary row */}
+      {/* Summary */}
       <div className="grid grid-cols-2 gap-4 mb-6 fade-up-2">
         <div className="p-5 rounded-2xl border" style={{ background: 'var(--forest-muted)', borderColor: '#c8e0b8' }}>
           <div className="text-xs mb-1" style={{ color: 'var(--forest)' }}>Total Income</div>
@@ -127,7 +137,7 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Tabs + Add buttons */}
+      {/* Tabs + Add */}
       <div className="flex items-center justify-between mb-4 fade-up-3">
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--stone-100)' }}>
           {['expenses', 'income'].map(t => (
@@ -137,7 +147,7 @@ export default function TransactionsPage() {
             </button>
           ))}
         </div>
-        <button onClick={() => tab === 'expenses' ? setShowModal(true) : setShowIncomeModal(true)}
+        <button onClick={() => tab === 'expenses' ? openAdd() : setShowIncomeModal(true)}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
           style={{ background: 'var(--stone-800)', color: 'var(--cream)', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
           <Plus size={14} /> Add {tab === 'expenses' ? 'Expense' : 'Income'}
@@ -154,106 +164,133 @@ export default function TransactionsPage() {
               <div className="text-3xl mb-3">💸</div>
               <div className="text-sm" style={{ color: 'var(--stone-400)' }}>No expenses yet this month</div>
             </div>
-          ) : (
-            transactions.map((t, i) => (
-              <div key={t.id} className="flex items-center justify-between px-5 py-4 border-b last:border-0 group" style={{ borderColor: 'var(--stone-100)' }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm flex-shrink-0" style={{ background: 'var(--stone-100)' }}>
-                    {t.budget_categories?.icon || '💰'}
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium" style={{ color: 'var(--stone-800)' }}>{t.description}</div>
-                    <div className="text-xs" style={{ color: 'var(--stone-400)' }}>
-                      {t.budget_categories?.name || 'Uncategorized'} · {format(new Date(t.date), 'MMM d, yyyy')}
-                    </div>
-                  </div>
+          ) : transactions.map(t => (
+            <div key={t.id} className="flex items-center justify-between px-5 py-4 border-b last:border-0 group" style={{ borderColor: 'var(--stone-100)' }}>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm flex-shrink-0" style={{ background: 'var(--stone-100)' }}>
+                  {t.budget_categories?.icon || '💰'}
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="font-mono text-sm font-medium" style={{ color: 'var(--rust)' }}>-{fmt(t.amount)}</div>
-                  <button onClick={() => handleDeleteTx(t.id)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stone-400)' }}
-                    onMouseEnter={e => e.currentTarget.style.color = 'var(--rust)'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'var(--stone-400)'}
-                  ><Trash2 size={14} /></button>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate" style={{ color: 'var(--stone-800)' }}>{t.description}</div>
+                  <div className="text-xs" style={{ color: 'var(--stone-400)' }}>
+                    {t.budget_categories?.name || 'Uncategorized'} · {format(new Date(t.date), 'MMM d, yyyy')}
+                  </div>
                 </div>
               </div>
-            ))
-          )
+              <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                <div className="font-mono text-sm font-medium" style={{ color: 'var(--rust)' }}>-{fmt(t.amount)}</div>
+                <button onClick={() => openEdit(t)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stone-400)' }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--stone-800)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--stone-400)'}
+                ><Pencil size={13} /></button>
+                <button onClick={() => handleDeleteTx(t.id)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stone-400)' }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--rust)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--stone-400)'}
+                ><Trash2 size={13} /></button>
+              </div>
+            </div>
+          ))
         ) : (
           income.length === 0 ? (
             <div className="p-12 text-center">
               <div className="text-3xl mb-3">💵</div>
               <div className="text-sm" style={{ color: 'var(--stone-400)' }}>No income recorded this month</div>
             </div>
-          ) : (
-            income.map(inc => (
-              <div key={inc.id} className="flex items-center justify-between px-5 py-4 border-b last:border-0 group" style={{ borderColor: 'var(--stone-100)' }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm flex-shrink-0" style={{ background: 'var(--forest-muted)' }}>💵</div>
-                  <div>
-                    <div className="text-sm font-medium" style={{ color: 'var(--stone-800)' }}>{inc.source}</div>
-                    {inc.notes && <div className="text-xs" style={{ color: 'var(--stone-400)' }}>{inc.notes}</div>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="font-mono text-sm font-medium" style={{ color: 'var(--forest)' }}>+{fmt(inc.amount)}</div>
-                  <button onClick={() => handleDeleteIncome(inc.id)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stone-400)' }}
-                    onMouseEnter={e => e.currentTarget.style.color = 'var(--rust)'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'var(--stone-400)'}
-                  ><Trash2 size={14} /></button>
+          ) : income.map(inc => (
+            <div key={inc.id} className="flex items-center justify-between px-5 py-4 border-b last:border-0 group" style={{ borderColor: 'var(--stone-100)' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm flex-shrink-0" style={{ background: 'var(--forest-muted)' }}>💵</div>
+                <div>
+                  <div className="text-sm font-medium" style={{ color: 'var(--stone-800)' }}>{inc.source}</div>
+                  {inc.notes && <div className="text-xs" style={{ color: 'var(--stone-400)' }}>{inc.notes}</div>}
                 </div>
               </div>
-            ))
-          )
+              <div className="flex items-center gap-2">
+                <div className="font-mono text-sm font-medium" style={{ color: 'var(--forest)' }}>+{fmt(inc.amount)}</div>
+                <button onClick={() => handleDeleteIncome(inc.id)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stone-400)' }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--rust)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--stone-400)'}
+                ><Trash2 size={13} /></button>
+              </div>
+            </div>
+          ))
         )}
       </div>
 
-      {/* Add Expense Modal */}
+      {/* Add / Edit Expense Modal */}
       {showModal && (
-        <Modal title="Add Expense" onClose={() => setShowModal(false)} onSubmit={handleAddTx}>
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Description</label>
-            <input className={inputClass} style={inputStyle} placeholder="e.g. Whole Foods" value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} required />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Amount ($)</label>
-              <input className={inputClass} style={inputStyle} type="number" step="0.01" min="0" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))} required />
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowModal(false)}>
+          <div className="w-full max-w-md rounded-2xl p-6 fade-up" style={{ background: 'var(--warm-white)' }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display text-xl" style={{ color: 'var(--stone-800)' }}>{editing ? 'Edit Expense' : 'Add Expense'}</h2>
+              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stone-400)' }}><X size={18} /></button>
             </div>
-            <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Date</label>
-              <input className={inputClass} style={inputStyle} type="date" value={form.date} onChange={e => setForm(f => ({...f, date: e.target.value}))} required />
-            </div>
+            <form onSubmit={handleSaveTx} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Description</label>
+                <input className={inputClass} style={inputStyle} placeholder="e.g. Whole Foods" value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} required autoFocus />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Amount ($)</label>
+                  <input className={inputClass} style={inputStyle} type="number" step="0.01" min="0" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))} required />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Date</label>
+                  <input className={inputClass} style={inputStyle} type="date" value={form.date} onChange={e => setForm(f => ({...f, date: e.target.value}))} required />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Category</label>
+                <select className={inputClass} style={inputStyle} value={form.category_id} onChange={e => setForm(f => ({...f, category_id: e.target.value}))}>
+                  <option value="">Uncategorized</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Notes (optional)</label>
+                <input className={inputClass} style={inputStyle} placeholder="Any notes…" value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} />
+              </div>
+              <button type="submit" disabled={saving} className="w-full py-3 rounded-xl text-sm font-medium"
+                style={{ background: 'var(--stone-800)', color: 'var(--cream)', border: 'none', cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>
+                {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Expense'}
+              </button>
+            </form>
           </div>
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Category</label>
-            <select className={inputClass} style={inputStyle} value={form.category_id} onChange={e => setForm(f => ({...f, category_id: e.target.value}))}>
-              <option value="">Uncategorized</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Notes (optional)</label>
-            <input className={inputClass} style={inputStyle} placeholder="Any notes…" value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} />
-          </div>
-        </Modal>
+        </div>
       )}
 
       {/* Add Income Modal */}
       {showIncomeModal && (
-        <Modal title="Add Income" onClose={() => setShowIncomeModal(false)} onSubmit={handleAddIncome}>
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Source</label>
-            <input className={inputClass} style={inputStyle} placeholder="e.g. Salary, Freelance" value={incomeForm.source} onChange={e => setIncomeForm(f => ({...f, source: e.target.value}))} required />
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowIncomeModal(false)}>
+          <div className="w-full max-w-md rounded-2xl p-6 fade-up" style={{ background: 'var(--warm-white)' }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display text-xl" style={{ color: 'var(--stone-800)' }}>Add Income</h2>
+              <button onClick={() => setShowIncomeModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stone-400)' }}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleAddIncome} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Source</label>
+                <input className={inputClass} style={inputStyle} placeholder="e.g. Salary, Freelance" value={incomeForm.source} onChange={e => setIncomeForm(f => ({...f, source: e.target.value}))} required autoFocus />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Amount ($)</label>
+                <input className={inputClass} style={inputStyle} type="number" step="0.01" min="0" placeholder="0.00" value={incomeForm.amount} onChange={e => setIncomeForm(f => ({...f, amount: e.target.value}))} required />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Notes (optional)</label>
+                <input className={inputClass} style={inputStyle} placeholder="Any notes…" value={incomeForm.notes} onChange={e => setIncomeForm(f => ({...f, notes: e.target.value}))} />
+              </div>
+              <button type="submit" disabled={saving} className="w-full py-3 rounded-xl text-sm font-medium"
+                style={{ background: 'var(--forest)', color: 'white', border: 'none', cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>
+                {saving ? 'Saving…' : 'Add Income'}
+              </button>
+            </form>
           </div>
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Amount ($)</label>
-            <input className={inputClass} style={inputStyle} type="number" step="0.01" min="0" placeholder="0.00" value={incomeForm.amount} onChange={e => setIncomeForm(f => ({...f, amount: e.target.value}))} required />
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Notes (optional)</label>
-            <input className={inputClass} style={inputStyle} placeholder="Any notes…" value={incomeForm.notes} onChange={e => setIncomeForm(f => ({...f, notes: e.target.value}))} />
-          </div>
-        </Modal>
+        </div>
       )}
     </div>
   )

@@ -66,6 +66,16 @@ export const addTransaction = async (tx) => {
   return { data, error }
 }
 
+export const updateTransaction = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('transactions')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  return { data, error }
+}
+
 export const deleteTransaction = async (id) => {
   const { error } = await supabase
     .from('transactions')
