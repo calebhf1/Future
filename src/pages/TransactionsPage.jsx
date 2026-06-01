@@ -231,7 +231,10 @@ export default function TransactionsPage() {
             <form onSubmit={handleSaveTx} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--stone-600)' }}>Description</label>
-                <input className={inputClass} style={inputStyle} placeholder="e.g. Whole Foods" value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} required autoFocus />
+                <input className={inputClass} style={inputStyle} placeholder="What was it? (e.g. Whole Foods)"
+                  value={quickForm.description} onChange={e => setQuickForm(f => ({...f, description: e.target.value}))}
+                  required autoFocus
+                  autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

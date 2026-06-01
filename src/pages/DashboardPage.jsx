@@ -403,8 +403,9 @@ export default function DashboardPage() {
             </div>
             <form onSubmit={handleQuickAdd} className="space-y-3">
               <input className={inputClass} style={inputStyle} placeholder="What was it? (e.g. Whole Foods)"
-                value={quickForm.description} onChange={e => setQuickForm(f => ({...f, description: e.target.value}))}
-                required autoFocus />
+              value={quickForm.description} onChange={e => setQuickForm(f => ({...f, description: e.target.value}))}
+              required autoFocus
+              autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false" />
               <div className="grid grid-cols-2 gap-3">
                 <input className={inputClass} style={inputStyle} type="number" step="0.01" min="0" placeholder="Amount ($)"
                   value={quickForm.amount} onChange={e => setQuickForm(f => ({...f, amount: e.target.value}))} required />
